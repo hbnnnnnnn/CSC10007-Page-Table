@@ -467,6 +467,6 @@ void vmprint_rec(pagetable_t pagetable, int level) {
 }
 
 void vmprint(pagetable_t pagetable) {
-  printf("Page Table:\n");
+  printf("page table: %p\n", pagetable);
   vmprint_rec(pagetable, 1);
 }
