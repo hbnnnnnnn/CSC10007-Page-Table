@@ -43,6 +43,32 @@ proc_mapstacks(pagetable_t kpgtbl)
   }
 }
 
+int pgaccess(uint64 base, int size, uint64 mask)
+{
+  if (size >= 64) {
+    printf("pgacess: page size too large\n");
+    return -1;
+  }
+  struct proc *p = myproc();
+  uint64 ret = 0;
+  pte_t *pte;
+
+  for (int i = 0; i < size; i++) {
+    pte = walk(p->pagetable, (base + PGSIZE * i), 0);
+    
+    if (*pte & PTE_A)
+      ret |= (1 << i);
+    *pte &= ~(PTE_A);
+  }
+
+  if (copyout(p->pagetable, mask, (char*)& ret, sizeof(ret)) < 0) {
+    printf("pgaccess: copyout failed\n");
+    return -1;
+  }
+
+  return 0;
+}
+
 // initialize the proc table.
 void
 procinit(void)
