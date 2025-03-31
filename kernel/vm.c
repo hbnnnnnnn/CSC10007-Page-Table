@@ -458,7 +458,7 @@ void vmprint_rec(pagetable_t pagetable, int level) {
       for (int j = 0; j < level; j++) {
         printf("..");
       }
-      printf("%d: pte 0x%p pa 0x%p\n", i, pte, pa);
+      printf("%d: pte %p pa %p\n", i, pte, pa);
       if ((pte & (PTE_R | PTE_W | PTE_X)) == 0) { 
         vmprint_rec((pagetable_t)pa, level + 1);
       }
