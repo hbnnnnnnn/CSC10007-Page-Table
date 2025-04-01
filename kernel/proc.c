@@ -43,6 +43,32 @@ proc_mapstacks(pagetable_t kpgtbl)
   }
 }
 
+int pgaccess(uint64 base, int size, uint64 mask)
+{
+  if (size >= 64) {
+    printf("pgacess: page size too large\n");
+    return -1;
+  }
+  struct proc *p = myproc();
+  uint64 ret = 0;
+  pte_t *pte;
+
+  for (int i = 0; i < size; i++) {
+    pte = walk(p->pagetable, (base + PGSIZE * i), 0);
+    
+    if (*pte & PTE_A)
+      ret |= (1 << i);
+    *pte &= ~(PTE_A);
+  }
+
+  if (copyout(p->pagetable, mask, (char*)& ret, sizeof(ret)) < 0) {
+    printf("pgaccess: copyout failed\n");
+    return -1;
+  }
+
+  return 0;
+}
+
 // initialize the proc table.
 void
 procinit(void)
@@ -132,6 +158,12 @@ found:
     return 0;
   }
 
+  if ((p->usys = (struct usyscall*)kalloc()) == 0){
+    freeproc(p);
+    release(&p->lock);
+    return 0;
+  }
+
   // An empty user page table.
   p->pagetable = proc_pagetable(p);
   if(p->pagetable == 0){
@@ -146,6 +178,7 @@ found:
   p->context.ra = (uint64)forkret;
   p->context.sp = p->kstack + PGSIZE;
 
+  p->usys->pid = p->pid;
   return p;
 }
 
@@ -158,6 +191,9 @@ freeproc(struct proc *p)
   if(p->trapframe)
     kfree((void*)p->trapframe);
   p->trapframe = 0;
+  if (p->usys) 
+    kfree((void*)p->usys);
+  p->usys = 0;
   if(p->pagetable)
     proc_freepagetable(p->pagetable, p->sz);
   p->pagetable = 0;
@@ -202,6 +238,13 @@ proc_pagetable(struct proc *p)
     return 0;
   }
 
+  if (mappages(pagetable, USYSCALL, PGSIZE, (uint64)(p->usys), PTE_R | PTE_U) < 0){
+    uvmunmap(pagetable, TRAPFRAME, 1, 0);
+    uvmunmap(pagetable, TRAMPOLINE, 1, 0);
+    uvmfree(pagetable, 0);
+    return 0;
+  }
+
   return pagetable;
 }
 
@@ -212,6 +255,7 @@ proc_freepagetable(pagetable_t pagetable, uint64 sz)
 {
   uvmunmap(pagetable, TRAMPOLINE, 1, 0);
   uvmunmap(pagetable, TRAPFRAME, 1, 0);
+  uvmunmap(pagetable, USYSCALL, 1, 0);
   uvmfree(pagetable, sz);
 }
 
